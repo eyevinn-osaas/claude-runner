@@ -1,0 +1,17 @@
+{
+  "name": "@eyevinn/claude-runner",
+  "version": "0.1.0",
+  "description": "Run headless Claude Code sessions against a git repository containing an agent team setup",
+  "license": "MIT",
+  "repository": {
+    "type": "git",
+    "url": "https://github.com/birme/claude-runner"
+  },
+  "keywords": [
+    "claude",
+    "ai",
+    "agent",
+    "runner",
+    "osc"
+  ]
+}
