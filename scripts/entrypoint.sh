@@ -112,7 +112,48 @@ if [ -d ".claude" ]; then
 fi
 
 # ------------------------------------------------------------------
-# 3. Configure GitHub CLI (if token available)
+# 3. Load environment variables from config service (if available)
+# ------------------------------------------------------------------
+
+if [ -n "${OSC_ACCESS_TOKEN:-}" ] && [ -n "${CONFIG_SVC:-}" ]; then
+  # Refresh the access token via the runner token service
+  REFRESH_RESULT=$(curl -sf -X POST \
+    "https://token.svc.${OSC_ENV:-prod}.osaas.io/runner-token/refresh" \
+    -H "Content-Type: application/json" \
+    -d "{\"token\":\"${OSC_ACCESS_TOKEN}\"}" 2>/dev/null) || true
+  if [ -n "${REFRESH_RESULT:-}" ]; then
+    FRESH_PAT=$(echo "${REFRESH_RESULT}" | jq -r '.token // empty')
+    if [ -n "${FRESH_PAT}" ]; then
+      export OSC_ACCESS_TOKEN="${FRESH_PAT}"
+      echo "[CONFIG] Refreshed access token via runner refresh token"
+    fi
+  fi
+
+  echo "[CONFIG] Loading environment variables from config service '${CONFIG_SVC}'"
+  config_env_output=$(npx -y @osaas/cli@latest web config-to-env "${CONFIG_SVC}" 2>&1) || true
+  config_exit=$?
+  if [ ${config_exit} -eq 0 ]; then
+    # Only eval lines that are valid shell export statements
+    valid_exports=$(echo "${config_env_output}" | grep "^export [A-Za-z_][A-Za-z0-9_]*=" || true)
+    if [ -n "${valid_exports}" ]; then
+      eval "${valid_exports}"
+      var_count=$(echo "${valid_exports}" | wc -l | tr -d ' ')
+      echo "[CONFIG] Loaded ${var_count} environment variable(s)"
+    else
+      echo "[CONFIG] WARNING: Config service returned success but no valid export statements."
+      echo "[CONFIG] Raw output: ${config_env_output}"
+    fi
+  else
+    echo "[CONFIG] ERROR: Failed to load config from '${CONFIG_SVC}' (exit code ${config_exit})."
+    echo "[CONFIG] Raw output: ${config_env_output}"
+    if echo "${config_env_output}" | grep -qi "expired\|unauthorized\|401"; then
+      echo "[CONFIG] Your OSC_ACCESS_TOKEN may have expired. Refresh it and retry."
+    fi
+  fi
+fi
+
+# ------------------------------------------------------------------
+# 4. Configure GitHub CLI (if token available)
 # ------------------------------------------------------------------
 
 if [ -n "${GIT_TOKEN}" ]; then
@@ -127,7 +168,7 @@ if [ -n "${GITHUB_TOKEN:-}" ]; then
 fi
 
 # ------------------------------------------------------------------
-# 4. Configure OSC MCP server (if token available)
+# 5. Configure OSC MCP server (if token available)
 # ------------------------------------------------------------------
 
 if [ -n "${OSC_ACCESS_TOKEN:-}" ]; then
@@ -150,7 +191,7 @@ MCPEOF
 fi
 
 # ------------------------------------------------------------------
-# 5. Build the Claude command
+# 6. Build the Claude command
 # ------------------------------------------------------------------
 
 CLAUDE_ARGS=("--print" "--dangerously-skip-permissions")
@@ -172,7 +213,7 @@ if [ -n "${DISALLOWEDTOOLS}" ]; then
 fi
 
 # ------------------------------------------------------------------
-# 6. Run the Claude session
+# 7. Run the Claude session
 # ------------------------------------------------------------------
 
 echo ""

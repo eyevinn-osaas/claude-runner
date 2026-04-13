@@ -30,7 +30,8 @@ Built for [Eyevinn Open Source Cloud](https://www.osaas.io).
 | `ALLOWEDTOOLS` | Comma-separated list of allowed tools |
 | `DISALLOWEDTOOLS` | Comma-separated list of disallowed tools |
 | `SUB_PATH` | Subdirectory within the repo to use as working directory |
-| `OSC_ACCESS_TOKEN` | Open Source Cloud access token. When set, configures an MCP server (HTTP transport) for [OSC](https://www.osaas.io) at `https://mcp.osaas.io/mcp` |
+| `CONFIG_SVC` | Name of an OSC Application Config Service instance. When set together with `OSC_ACCESS_TOKEN`, environment variables are loaded from the config service before the Claude session starts |
+| `OSC_ACCESS_TOKEN` | Open Source Cloud access token. Enables the OSC MCP server and config service integration |
 
 ## Usage
 
