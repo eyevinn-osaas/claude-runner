@@ -6,6 +6,15 @@ set -euo pipefail
 # a git repository containing an agent team setup.
 # ============================================================
 
+# ------------------------------------------------------------------
+# 0. Fix volume ownership (runs as root, then drops to node)
+# ------------------------------------------------------------------
+
+if [ "$(id -u)" = "0" ]; then
+  chown -R node:node /usercontent
+  exec runuser -u node -- "$0" "$@"
+fi
+
 echo "=== claude-runner ==="
 echo "Starting at $(date -u '+%Y-%m-%dT%H:%M:%SZ')"
 
