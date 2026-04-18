@@ -6,6 +6,12 @@ RUN apt-get update && apt-get install -y --no-install-recommends \
     curl \
     jq \
     ca-certificates \
+    python3 \
+    python3-pip \
+    python3-venv \
+    make \
+    g++ \
+    && ln -sf /usr/bin/python3 /usr/local/bin/python \
     && rm -rf /var/lib/apt/lists/*
 
 # Install GitHub CLI
