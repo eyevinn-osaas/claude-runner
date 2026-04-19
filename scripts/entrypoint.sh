@@ -173,20 +173,23 @@ fi
 
 if [ -n "${OSC_ACCESS_TOKEN:-}" ]; then
   echo "Configuring OSC MCP server..."
-  mkdir -p "${HOME}/.claude"
-  cat > "${HOME}/.claude/settings.json" <<MCPEOF
-{
-  "mcpServers": {
-    "OSC": {
-      "type": "http",
-      "url": "https://mcp.osaas.io/mcp",
-      "headers": {
-        "Authorization": "Bearer ${OSC_ACCESS_TOKEN}"
-      }
-    }
-  }
-}
-MCPEOF
+  # Use the Claude Code CLI to register the MCP server at user scope
+  # (~/.claude.json). Writing to ~/.claude/settings.json does NOT register
+  # MCP servers — that key only exists in ~/.claude.json (user scope) or a
+  # project-level .mcp.json. The CLI is the only supported registration path.
+  if ! claude mcp add-json --scope user OSC "$(jq -nc \
+      --arg url "https://mcp.osaas.io/mcp" \
+      --arg auth "Bearer ${OSC_ACCESS_TOKEN}" \
+      '{type:"http", url:$url, headers:{Authorization:$auth}}')"; then
+    echo "ERROR: 'claude mcp add-json' failed to register OSC MCP server" >&2
+    exit 1
+  fi
+  # Verify the server actually registered — catches the class of silent
+  # failures where add-json exits 0 but the config didn't stick.
+  if ! claude mcp list 2>&1 | grep -q "^OSC"; then
+    echo "ERROR: OSC MCP server registration did not stick — 'claude mcp list' did not return OSC" >&2
+    exit 1
+  fi
   echo "OSC MCP server configured (https://mcp.osaas.io/mcp)"
 fi
 
