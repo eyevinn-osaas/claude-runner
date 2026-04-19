@@ -29,7 +29,8 @@ Built for [Eyevinn Open Source Cloud](https://www.osaas.io).
 | `MAX_TURNS` | Maximum number of agentic turns |
 | `ALLOWEDTOOLS` | Comma-separated list of allowed tools |
 | `DISALLOWEDTOOLS` | Comma-separated list of disallowed tools |
-| `VERBOSE` | Verbose logging (tool calls, intermediate turns). Enabled by default. Set to `0` or `false` to disable. |
+| `VERBOSE` | Rich logging (tool calls, tool results, intermediate turns). Enabled by default — the runner streams JSONL events from Claude and formats them into human-readable stdout. Set to `0` or `false` to fall back to plain text (final assistant message only). |
+| `RAW_JSON` | Set to `1` or `true` to emit raw JSONL (one JSON event per line) instead of formatted output. Useful for shipping to log aggregators. Requires `VERBOSE` to be on (the default). |
 | `SUB_PATH` | Subdirectory within the repo to use as working directory |
 | `CONFIG_SVC` | Name of an OSC Application Config Service instance. When set together with `OSC_ACCESS_TOKEN`, environment variables are loaded from the config service before the Claude session starts |
 | `OSC_ACCESS_TOKEN` | Open Source Cloud access token. Enables the OSC MCP server and config service integration |
@@ -104,8 +105,8 @@ The cloned repository should contain Claude Code configuration:
 2. Clones the repository (with token auth for private repos)
 3. Optionally navigates to `SUB_PATH`
 4. Authenticates the GitHub CLI if a GitHub token is available
-5. Runs `claude --print --dangerously-skip-permissions` with the provided prompt
-6. All output is logged to stdout/stderr
+5. Runs `claude --print --dangerously-skip-permissions --verbose --output-format stream-json` with the provided prompt
+6. Formats the JSONL event stream into human-readable stdout (tool calls, tool results, intermediate turns). Set `RAW_JSON=1` to emit raw JSONL, or `VERBOSE=0` to fall back to plain text output
 7. Exits with Claude's exit code
 
 ## About Eyevinn Technology

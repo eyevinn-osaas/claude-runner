@@ -196,8 +196,14 @@ fi
 
 CLAUDE_ARGS=("--print" "--dangerously-skip-permissions")
 
+# Stream JSONL events by default so tool calls, tool results, and
+# intermediate assistant turns are visible. A formatter (see step 7)
+# turns the JSONL into human-readable stdout. Set VERBOSE=0 to fall
+# back to plain text output (final assistant message only).
+STREAM_JSON_ENABLED=0
 if [ "${VERBOSE:-1}" != "0" ] && [ "${VERBOSE:-1}" != "false" ]; then
-  CLAUDE_ARGS+=("--verbose")
+  CLAUDE_ARGS+=("--verbose" "--output-format" "stream-json")
+  STREAM_JSON_ENABLED=1
 fi
 
 if [ -n "${MODEL}" ]; then
@@ -233,10 +239,20 @@ export CLAUDE_CODE_OAUTH_TOKEN="${CLAUDE_CODE_OAUTH_TOKEN:-}"
 # Disable telemetry in CI/container context
 export DISABLE_AUTOUPDATER=1
 
-# Run claude with the prompt — all output goes to stdout/stderr
-claude "${CLAUDE_ARGS[@]}" "${PROMPT}"
-
-EXIT_CODE=$?
+# Run claude with the prompt. When stream-json is enabled (default),
+# pipe through the formatter for human-readable stdout. Set RAW_JSON=1
+# to skip the formatter and emit raw JSONL (useful for log shipping).
+if [ "${STREAM_JSON_ENABLED}" = "1" ] && [ "${RAW_JSON:-}" != "1" ] && [ "${RAW_JSON:-}" != "true" ]; then
+  set +e
+  claude "${CLAUDE_ARGS[@]}" "${PROMPT}" | node /runner/format-stream.js
+  EXIT_CODE=${PIPESTATUS[0]}
+  set -e
+else
+  set +e
+  claude "${CLAUDE_ARGS[@]}" "${PROMPT}"
+  EXIT_CODE=$?
+  set -e
+fi
 
 echo ""
 echo "=== Claude session ended ==="
