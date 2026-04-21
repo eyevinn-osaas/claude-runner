@@ -103,6 +103,11 @@ fi
 cd "${WORK_DIR}"
 echo "Working directory: $(pwd)"
 
+# Set a git identity so Claude can commit without having to run git config mid-session.
+git config user.email "agent@claude.ai"
+git config user.name "Claude Agent"
+echo "Git identity set: Claude Agent <agent@claude.ai>"
+
 # Show repo info
 if [ -f "CLAUDE.md" ]; then
   echo "Found CLAUDE.md in repository."
