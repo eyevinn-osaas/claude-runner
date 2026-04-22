@@ -34,6 +34,7 @@ Built for [Eyevinn Open Source Cloud](https://www.osaas.io).
 | `SUB_PATH` | Subdirectory within the repo to use as working directory |
 | `CONFIG_SVC` | Name of an OSC Application Config Service instance. When set together with `OSC_ACCESS_TOKEN`, environment variables are loaded from the config service before the Claude session starts |
 | `OSC_ACCESS_TOKEN` | Open Source Cloud access token. Enables the OSC MCP server and config service integration |
+| `OSC_MCP_URL` | Override the OSC MCP server URL. Defaults to `https://mcp.osaas.io/mcp`. Set to `https://ai.svc.{env}.osaas.io/mcp` for dev/stage, or the env-specific equivalent. |
 
 ## Usage
 
