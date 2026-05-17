@@ -1,4 +1,4 @@
-FROM node:20-bookworm-slim
+FROM node:22-bookworm-slim
 
 RUN apt-get update && apt-get install -y --no-install-recommends \
     bash \
@@ -27,6 +27,8 @@ RUN curl -fsSL https://cli.github.com/packages/githubcli-archive-keyring.gpg \
 RUN npm install -g @anthropic-ai/claude-code
 
 # Install nvm for the node user so agents can install/switch Node versions.
+# Node 20 and 22 are pre-installed so agents can switch offline with
+# `nvm use 20` or `nvm use 22` without a network download at runtime.
 # BASH_ENV makes nvm available in non-interactive `bash -c` commands (what
 # Claude's Bash tool uses). The init script guards `set -eu` so it is safe
 # to source from the entrypoint, which runs with `set -euo pipefail`.
@@ -36,6 +38,10 @@ ENV BASH_ENV=/home/node/.nvm_init.sh
 RUN mkdir -p "$NVM_DIR" \
     && curl -fsSL "https://raw.githubusercontent.com/nvm-sh/nvm/${NVM_VERSION}/install.sh" \
        | NVM_DIR="$NVM_DIR" PROFILE=/dev/null bash \
+    && . "$NVM_DIR/nvm.sh" \
+    && nvm install 20 \
+    && nvm install 22 \
+    && nvm alias default 22 \
     && printf '%s\n' \
        'export NVM_DIR="/home/node/.nvm"' \
        'if [ -s "$NVM_DIR/nvm.sh" ]; then' \
