@@ -67,16 +67,45 @@ if [[ "${SOURCE_URL}" == *"#"* ]]; then
 fi
 
 # Determine the git token to use
-GIT_TOKEN="${GIT_TOKEN:-${GITHUB_TOKEN:-}}"
+export GIT_TOKEN="${GIT_TOKEN:-${GITHUB_TOKEN:-}}"
 
-# Build the authenticated clone URL
-CLONE_URL="${SOURCE_URL}"
-if [ -n "${GIT_TOKEN}" ]; then
-  # Strip protocol prefix to rebuild with token
-  URL_WITHOUT_PROTO="${SOURCE_URL#https://}"
-  URL_WITHOUT_PROTO="${URL_WITHOUT_PROTO#http://}"
-  CLONE_URL="https://${GIT_TOKEN}@${URL_WITHOUT_PROTO}"
-  echo "Cloning private repository (token injected)..."
+# Token file for GitHub-connection refresh (see token-refresh.sh). Lives on tmpfs when
+# available. The credential helper prefers this file over GIT_TOKEN when it exists.
+TOKEN_REFRESH_ENABLED=0
+if [ -n "${GIT_TOKEN_REFRESH:-}" ] && [ -n "${DEPLOY_MANAGER_URL:-}" ]; then
+  TOKEN_REFRESH_ENABLED=1
+  if [ -d /dev/shm ] && [ -w /dev/shm ]; then
+    TOKEN_DIR=$(mktemp -d /dev/shm/git-token.XXXXXX)
+  else
+    TOKEN_DIR=$(mktemp -d)
+  fi
+  chmod 700 "${TOKEN_DIR}"
+  export GIT_TOKEN_FILE="${TOKEN_DIR}/token"
+  # Seed with the token the run started with so gh sees it before the first refresh
+  if [ -n "${GIT_TOKEN}" ]; then
+    (umask 077; printf '%s' "${GIT_TOKEN}" > "${GIT_TOKEN_FILE}")
+  fi
+fi
+
+# Set up git credential helper — never embed the token in the remote URL or git config.
+# The helper script reads the refreshed token file (when present) or GIT_TOKEN from the
+# environment at authentication time, so "git remote -v" and "git config --list" cannot
+# leak the token.
+if [ -n "${GIT_TOKEN}" ] || [ "${TOKEN_REFRESH_ENABLED}" = "1" ]; then
+  GIT_CRED_HELPER=$(mktemp)
+  cat > "${GIT_CRED_HELPER}" << 'CRED_EOF'
+#!/bin/sh
+if [ -n "${GIT_TOKEN_FILE:-}" ] && [ -s "${GIT_TOKEN_FILE}" ]; then
+  _token=$(cat "${GIT_TOKEN_FILE}")
+else
+  _token="${GIT_TOKEN:-}"
+fi
+echo "username=x"
+echo "password=${_token}"
+CRED_EOF
+  chmod +x "${GIT_CRED_HELPER}"
+  git config --global credential.helper "${GIT_CRED_HELPER}"
+  echo "Cloning private repository..."
 else
   echo "Cloning public repository..."
 fi
@@ -87,7 +116,7 @@ if [ -n "${BRANCH}" ]; then
   echo "Branch: ${BRANCH}"
 fi
 
-git clone "${CLONE_ARGS[@]}" "${CLONE_URL}" "${WORK_DIR}" 2>&1
+git clone "${CLONE_ARGS[@]}" "${SOURCE_URL}" "${WORK_DIR}" 2>&1
 echo "Repository cloned successfully."
 
 # Navigate to work directory (optionally into sub-path)
@@ -167,13 +196,32 @@ if [ -n "${OSC_ACCESS_TOKEN:-}" ] && [ -n "${CONFIG_SVC:-}" ]; then
   fi
 fi
 
+# Record whether GH_TOKEN came from the parameter store. The gh shim only uses the
+# GitHub-connection token when this is not "paramstore" (a parameter-store GH_TOKEN
+# always takes precedence).
+if [ -n "${GH_TOKEN:-}" ]; then
+  export GH_TOKEN_SOURCE=paramstore
+fi
+
+# Start the background token refresher (GitHub connection, runs longer than 1 h)
+if [ "${TOKEN_REFRESH_ENABLED}" = "1" ]; then
+  if [ -n "${TASK_ID:-}" ] && [ -n "${RUN_ID:-}" ] && [ -n "${TENANT_ID:-}" ]; then
+    /runner/token-refresh.sh &
+    echo "[GIT-TOKEN] Background token refresh started (every ${TOKEN_REFRESH_INTERVAL:-2700}s)"
+  else
+    echo "[GIT-TOKEN] WARNING: GIT_TOKEN_REFRESH set but TASK_ID, RUN_ID or TENANT_ID missing; token will not be refreshed"
+  fi
+fi
+
 # ------------------------------------------------------------------
 # 4. Configure GitHub CLI (if token available)
 # ------------------------------------------------------------------
 
 if [ -n "${GIT_TOKEN}" ]; then
-  # Configure git to use the token for any subsequent operations
-  git config --global url."https://${GIT_TOKEN}@github.com/".insteadOf "https://github.com/"
+  # The global credential helper (set during clone above) handles subsequent
+  # git operations — no url.insteadOf rewrite needed. That pattern embedded the
+  # token in ~/.gitconfig, making it visible via "git config --list".
+  : # no-op
 fi
 
 if [ -n "${GITHUB_TOKEN:-}" ]; then

@@ -36,6 +36,10 @@ Built for [Eyevinn Open Source Cloud](https://www.osaas.io).
 | `OSC_ACCESS_TOKEN` | Open Source Cloud access token. Enables the OSC MCP server and config service integration |
 | `CONFIG_API_KEY` | API key for encrypted parameter store. When set alongside `OSC_ACCESS_TOKEN` and `CONFIG_SVC`, secret parameters are decrypted before being injected as environment variables. |
 | `OSC_MCP_URL` | Override the OSC MCP server URL. Defaults to `https://mcp.osaas.io/mcp`. Set to `https://ai.svc.{env}.osaas.io/mcp` for dev/stage, or the env-specific equivalent. |
+| `GIT_TOKEN_REFRESH` | Per-run nonce for refreshing a GitHub connection token. Set by deploy-manager for agent tasks with `githubConnection`. Together with `DEPLOY_MANAGER_URL`, `TASK_ID`, `RUN_ID` and `TENANT_ID` it starts a background loop that fetches a new token every 45 minutes (`TOKEN_REFRESH_INTERVAL` seconds to override) into a 0600 tmpfs file. The git credential helper reads that file when present and `GIT_TOKEN` otherwise. A refresh failure keeps the old token. |
+| `DEPLOY_MANAGER_URL`, `TASK_ID`, `RUN_ID`, `TENANT_ID` | Used with `GIT_TOKEN_REFRESH` as above. |
+
+`gh` is wrapped by a shim that exports `GH_TOKEN` from the refreshed token file, except when `GH_TOKEN` was loaded from the parameter store (`GH_TOKEN_SOURCE=paramstore`): a parameter-store `GH_TOKEN` always wins.
 
 ## Usage
 
